@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Feedback Reviewer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0c0e14;
+    --surface: #13161f;
+    --card: #1a1e2a;
+    --border: #252a38;
+    --accent: #5b8def;
+    --accent2: #e06c75;
+    --accent3: #98c379;
+    --text: #d4daf0;
+    --muted: #6b7494;
+    --highlight: #2a3050;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.02em;
+  }
+
+  header p { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+  .badge {
+    margin-left: auto;
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    background: rgba(91,141,239,0.15);
+    border: 1px solid rgba(91,141,239,0.3);
+    border-radius: 20px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .main { display: flex; height: calc(100vh - 73px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .upload-zone {
+    margin: 1.2rem;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover { border-color: var(--accent); background: rgba(91,141,239,0.05); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .upload-zone p { font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+  .upload-zone strong { color: var(--text); font-size: 0.8rem; }
+
+  .sidebar-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    padding: 0.5rem 1.2rem 0.3rem;
+  }
+
+  .member-list { overflow-y: auto; flex: 1; padding: 0 0.6rem 1rem; }
+
+  .member-item {
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .member-item:hover { background: var(--highlight); }
+  .member-item.active { background: rgba(91,141,239,0.2); border: 1px solid rgba(91,141,239,0.3); }
+
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: white;
+  }
+
+  .member-info { flex: 1; min-width: 0; }
+  .member-name { font-size: 0.78rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Syne', sans-serif; font-weight: 600; }
+  .member-email { font-size: 0.63rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--border);
+  }
+  .status-dot.done { background: var(--accent3); }
+  .status-dot.partial { background: #e5c07b; }
+
+  /* MAIN AREA */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    text-align: center;
+    gap: 1rem;
+  }
+  .empty-state .big-icon { font-size: 4rem; opacity: 0.3; }
+  .empty-state h2 { font-family: 'Syne', sans-serif; font-size: 1.2rem; color: var(--text); }
+  .empty-state p { font-size: 0.78rem; max-width: 320px; line-height: 1.6; }
+
+  .member-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .member-header .big-avatar {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .member-header-info h2 { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 700; color: white; }
+  .member-header-info p { font-size: 0.72rem; color: var(--muted); }
+
+  .gen-btn {
+    margin-left: auto;
+    padding: 0.6rem 1.2rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .gen-btn:hover { background: #4a7bd4; transform: translateY(-1px); }
+  .gen-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .gen-all-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid rgba(91,141,239,0.4);
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 0.5rem;
+  }
+  .gen-all-btn:hover { background: rgba(91,141,239,0.1); }
+  .gen-all-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .section-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .section-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .section-card.full-width { grid-column: 1 / -1; }
+
+  .section-card-header {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .section-card-header .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  .section-card pre, .section-card p {
+    padding: 0.8rem 1rem;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  /* FEEDBACK OUTPUT */
+  .feedback-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .feedback-header {
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.8rem;
+  }
+  .feedback-header h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: white;
+    flex: 1;
+  }
+
+  .copy-btn {
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .feedback-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1;
+    padding: 0.7rem;
+    text-align: center;
+    font-size: 0.68rem;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-icon { margin-right: 5px; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .feedback-field {
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .feedback-field:last-child { border-bottom: none; }
+  .feedback-field label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    padding: 0.8rem;
+    resize: vertical;
+    min-height: 120px;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea.loading { opacity: 0.6; animation: pulse 1.5s infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.3; } }
+
+  .spinner { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .export-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    display: flex; align-items: center; gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .export-bar p { font-size: 0.72rem; color: var(--muted); flex: 1; }
+
+  .export-btn {
+    padding: 0.5rem 1.2rem;
+    background: var(--accent3);
+    color: #0c0e14;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .export-btn:hover { opacity: 0.85; }
+  .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .toast {
+    position: fixed;
+    bottom: 2rem; right: 2rem;
+    background: var(--accent3);
+    color: #0c0e14;
+    padding: 0.7rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-family: 'DM Mono', monospace;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 9999;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .progress-bar {
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FR</div>
+  <div>
+    <h1>Team Feedback Reviewer</h1>
+    <p>AI-powered reviewer evaluations from self-assessment data</p>
+  </div>
+  <div class="badge" id="modelBadge">AWS Bedrock · Claude Sonnet</div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <div class="icon">📊</div>
+      <strong>Drop Excel file here</strong>
+      <p>or click to browse<br><span id="uploadStatus">Supports .xlsx format</span></p>
+    </div>
+    <div class="sidebar-label">Team Members</div>
+    <div class="member-list" id="memberList">
+      <div style="padding: 1rem; text-align: center; font-size: 0.72rem; color: var(--muted);">No file loaded yet</div>
+    </div>
+  </div>
+
+  <div class="content" id="mainContent">
+    <div class="empty-state">
+      <div class="big-icon">📋</div>
+      <h2>Load your feedback sheet</h2>
+      <p>Upload the Excel file and select a team member to generate their reviewer evaluation using Claude AI.</p>
+      <p style="font-size:0.7rem;color:var(--accent);margin-top:0.5rem;">Run <code style="background:var(--card);padding:2px 6px;border-radius:4px;">node server.js</code> and open <code style="background:var(--card);padding:2px 6px;border-radius:4px;">http://localhost:3001/</code> (uses AWS Bedrock; set AWS_REGION and credentials).</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const COLORS = ['#5b8def','#e06c75','#98c379','#e5c07b','#c678dd','#56b6c2','#d19a66'];
+let members = [];
+let currentIdx = null;
+let feedbackStore = {};
+
+document.getElementById('fileInput').addEventListener('change', handleFile);
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const wb = XLSX.read(ev.target.result, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    parseSheet(data);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseSheet(data) {
+  const headers = data[0];
+  members = [];
+  feedbackStore = {};
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    if (!row[1]) continue; // skip empty rows
+
+    const email = row[1] || '';
+    const name = emailToName(email);
+
+    // Columns C to AJ = indices 2 to 35 (0-based)
+    const selfData = {};
+    for (let c = 2; c <= 35; c++) {
+      if (headers[c] && row[c]) {
+        selfData[headers[c]] = row[c];
+      }
+    }
+
+    // Column AK = index 36
+    const managerNotes = row[36] || '';
+
+    // Pre-existing reviewer data (cols 37,38,39)
+    const existing = {
+      cont: row[37] || '',
+      stop: row[38] || '',
+      start: row[39] || ''
+    };
+
+    members.push({ email, name, selfData, managerNotes, existing, rowIdx: r, color: COLORS[members.length % COLORS.length] });
+
+    feedbackStore[r] = {
+      cont: existing.cont,
+      stop: existing.stop,
+      start: existing.start,
+      generated: false
+    };
+  }
+
+  document.getElementById('uploadStatus').textContent = `✓ ${members.length} members loaded`;
+  renderMemberList();
+}
+
+function emailToName(email) {
+  const local = email.split('@')[0];
+  return local.split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+}
+
+function initials(name) {
+  return name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+}
+
+function renderMemberList() {
+  const list = document.getElementById('memberList');
+  list.innerHTML = members.map((m, i) => {
+    const fb = feedbackStore[m.rowIdx];
+    const isDone = fb.cont && fb.stop && fb.start;
+    const isPartial = (fb.cont || fb.stop || fb.start) && !isDone;
+    return `
+      <div class="member-item ${currentIdx === i ? 'active' : ''}" onclick="selectMember(${i})">
+        <div class="avatar" style="background:${m.color}">${initials(m.name)}</div>
+        <div class="member-info">
+          <div class="member-name">${m.name}</div>
+          <div class="member-email">${m.email}</div>
+        </div>
+        <div class="status-dot ${isDone ? 'done' : isPartial ? 'partial' : ''}"></div>
+      </div>`;
+  }).join('');
+
+  // Add generate all button
+  list.insertAdjacentHTML('afterbegin', `
+    <div style="padding: 0.4rem 0.4rem 0.8rem;">
+      <button class="gen-all-btn" id="genAllBtn" onclick="generateAll()" style="width:100%">⚡ Generate All Evaluations</button>
+      <button class="gen-all-btn" onclick="exportUpdated()" style="width:100%;margin-top:0.4rem;color:var(--accent3);border-color:rgba(152,195,121,0.4);">📥 Export All Feedback</button>
+    </div>`);
+}
+
+function selectMember(idx) {
+  currentIdx = idx;
+  renderMemberList();
+  renderMemberView(idx);
+}
+
+function renderMemberView(idx) {
+  const m = members[idx];
+  const fb = feedbackStore[m.rowIdx];
+
+  // Build self-data sections
+  const selfSections = Object.entries(m.selfData)
+    .filter(([k,v]) => v && String(v).trim())
+    .map(([k,v]) => `
+      <div class="section-card full-width">
+        <div class="section-card-header"><span class="dot" style="background:${m.color}"></span>${k.slice(0,80)}</div>
+        <p>${String(v).slice(0, 600)}${String(v).length > 600 ? '…' : ''}</p>
+      </div>`).join('');
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="member-header">
+      <div class="big-avatar" style="background:${m.color}">${initials(m.name)}</div>
+      <div class="member-header-info">
+        <h2>${m.name}</h2>
+        <p>${m.email}</p>
+      </div>
+      <button class="gen-btn" id="genBtn" onclick="generateFeedback(${idx})">
+        <span id="genBtnIcon">✨</span> Generate Evaluation
+      </button>
+    </div>
+
+    <div class="feedback-section">
+      <div class="feedback-header">
+        <h3>Reviewer Evaluation</h3>
+        <button class="copy-btn" onclick="copyAll(${idx})">Copy All</button>
+        <button class="copy-btn" onclick="exportUpdated()" style="color: var(--accent3); border-color: rgba(152,195,121,0.3)">Export XLSX</button>
+      </div>
+      <div class="feedback-field">
+        <label>✅ Continue doing</label>
+        <textarea id="contField" placeholder="What should this employee CONTINUE doing?"
+          onchange="saveField(${idx}, 'cont', this.value)">${fb.cont}</textarea>
+      </div>
+      <div class="feedback-field">
+        <label>🛑 Stop doing</label>
+        <textarea id="stopField" placeholder="What should this employee STOP doing?"
+          onchange="saveField(${idx}, 'stop', this.value)">${fb.stop}</textarea>
+      </div>
+      <div class="feedback-field">
+        <label>🚀 Start doing</label>
+        <textarea id="startField" placeholder="What should this employee START doing?"
+          onchange="saveField(${idx}, 'start', this.value)">${fb.start}</textarea>
+      </div>
+    </div>
+
+    ${m.managerNotes ? `
+    <div class="section-card">
+      <div class="section-card-header"><span class="dot" style="background:#e5c07b"></span>My Personal Data Points</div>
+      <pre>${m.managerNotes}</pre>
+    </div>` : ''}
+
+    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <summary style="padding:0.8rem 1rem;cursor:pointer;font-size:0.72rem;color:var(--muted);user-select:none;">
+        📄 Self-Evaluation Data (${Object.keys(m.selfData).length} fields)
+      </summary>
+      <div class="section-grid" style="padding:1rem;gap:0.8rem;">${selfSections}</div>
+    </details>
+  `;
+}
+
+function saveField(idx, field, value) {
+  const m = members[idx];
+  feedbackStore[m.rowIdx][field] = value;
+  renderMemberList();
+}
+
+async function generateFeedback(idx) {
+  const m = members[idx];
+  const btn = document.getElementById('genBtn');
+  const icon = document.getElementById('genBtnIcon');
+
+  btn.disabled = true;
+  icon.innerHTML = '<span class="spinner">⟳</span>';
+
+  const contField = document.getElementById('contField');
+  const stopField = document.getElementById('stopField');
+  const startField = document.getElementById('startField');
+
+  [contField, stopField, startField].forEach(f => { f.classList.add('loading'); f.value = 'Generating…'; });
+
+  const selfSummary = Object.entries(m.selfData)
+    .filter(([k,v]) => v && String(v).trim())
+    .map(([k,v]) => `### ${k}\n${String(v).slice(0,400)}`)
+    .join('\n\n');
+
+  const prompt = `You are a senior engineering manager writing annual performance review evaluations. 
+Based on the team member's self-evaluation and personal data points from the reviewer, generate clear, specific, and actionable reviewer evaluations.
+
+TEAM MEMBER: ${m.name} (${m.email})
+
+SELF-EVALUATION DATA:
+${selfSummary}
+
+MANAGER'S PERSONAL DATA POINTS / NOTES:
+${m.managerNotes || 'No additional notes provided.'}
+
+Generate three sections of reviewer evaluation. Be specific, professional, and honest. Reference actual work mentioned. Avoid generic statements. Each section should have 2-4 bullet points.
+
+Respond ONLY in this JSON format:
+{
+  "continue": "bullet point 1\nbullet point 2\nbullet point 3",
+  "stop": "bullet point 1\nbullet point 2",
+  "start": "bullet point 1\nbullet point 2\nbullet point 3"
+}`;
+
+  // Use local proxy to avoid CORS and keep API key server-side (run: node server.js)
+  const apiBase = (window.location.port === '3001' || (window.location.hostname === 'localhost' && window.location.port !== '')) ? '' : 'http://localhost:3001';
+  const apiUrl = apiBase + '/api/generate';
+
+  try {
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || data.message || 'API error');
+    }
+    const text = (data.content || []).map(b => b.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    contField.value = parsed.continue || '';
+    stopField.value = parsed.stop || '';
+    startField.value = parsed.start || '';
+
+    feedbackStore[m.rowIdx].cont = parsed.continue || '';
+    feedbackStore[m.rowIdx].stop = parsed.stop || '';
+    feedbackStore[m.rowIdx].start = parsed.start || '';
+    feedbackStore[m.rowIdx].generated = true;
+
+    [contField, stopField, startField].forEach(f => f.classList.remove('loading'));
+    renderMemberList();
+    showToast(`✓ Evaluation generated for ${m.name}`);
+  } catch (err) {
+    [contField, stopField, startField].forEach(f => { f.classList.remove('loading'); f.value = ''; });
+    showToast('❌ Error: ' + err.message);
+    console.error(err);
+  }
+
+  btn.disabled = false;
+  icon.innerHTML = '✨';
+}
+
+async function generateAll() {
+  const btn = document.getElementById('genAllBtn');
+  if (!btn || members.length === 0) return;
+  btn.disabled = true;
+
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i];
+    const fb = feedbackStore[m.rowIdx];
+    if (fb.cont && fb.stop && fb.start) continue; // skip already done
+
+    btn.textContent = `⟳ Generating ${i+1}/${members.length}…`;
+    selectMember(i);
+    await new Promise(r => setTimeout(r, 300));
+    await generateFeedback(i);
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ All Generated';
+  showToast(`✓ Generated evaluations for all team members`);
+}
+
+function copyAll(idx) {
+  const m = members[idx];
+  const fb = feedbackStore[m.rowIdx];
+  const text = `REVIEWER EVALUATION – ${m.name}\n\nCONTINUE:\n${fb.cont}\n\nSTOP:\n${fb.stop}\n\nSTART:\n${fb.start}`;
+  navigator.clipboard.writeText(text);
+  showToast('Copied to clipboard!');
+}
+
+function exportUpdated() {
+  if (members.length === 0) { showToast('No data to export'); return; }
+
+  // Build a simple export
+  const rows = [['Email', 'Name', 'Continue Doing', 'Stop Doing', 'Start Doing']];
+  members.forEach(m => {
+    const fb = feedbackStore[m.rowIdx];
+    rows.push([m.email, m.name, fb.cont || '', fb.stop || '', fb.start || '']);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Reviewer Evaluations');
+  XLSX.writeFile(wb, 'reviewer-evaluations.xlsx');
+  showToast('✓ Exported reviewer-evaluations.xlsx');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

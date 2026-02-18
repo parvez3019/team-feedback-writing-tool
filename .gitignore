@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Logs and debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Optional: uncomment if you prefer to regenerate sample each time
+# sample-feedback.xlsx

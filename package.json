@@ -1,0 +1,17 @@
+{
+  "name": "team-feedback-tool",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "generate-sample": "node scripts/generate-sample.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.700.0"
+  },
+  "devDependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
