@@ -75,7 +75,10 @@
     font-family: 'DM Mono', monospace;
   }
 
-  .main { display: flex; height: calc(100vh - 73px); }
+  .main {
+    display: flex;
+    min-height: calc(100vh - 73px);
+  }
 
   /* SIDEBAR */
   .sidebar {
@@ -85,7 +88,6 @@
     background: var(--surface);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
   }
 
   .upload-zone {
@@ -112,7 +114,7 @@
     padding: 0.5rem 1.2rem 0.3rem;
   }
 
-  .member-list { overflow-y: auto; flex: 1; padding: 0 0.6rem 1rem; }
+  .member-list { padding: 0 0.6rem 1rem; }
 
   .member-item {
     padding: 0.6rem 0.8rem;
@@ -155,8 +157,6 @@
   /* MAIN AREA */
   .content {
     flex: 1;
-    min-height: 0;
-    overflow-y: auto;
     padding: 2rem;
     display: flex;
     flex-direction: column;
@@ -260,44 +260,28 @@
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--text);
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .section-card.section-card--scrollable {
-    max-height: min(50vh, 400px);
-    display: flex;
-    flex-direction: column;
-  }
-  .section-card.section-card--scrollable pre {
-    max-height: none;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
   }
 
   .self-eval-details {
-    max-height: min(70vh, 560px);
-    display: flex;
-    flex-direction: column;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
   }
-  .self-eval-details[open] {
-    max-height: min(70vh, 560px);
-  }
   .self-eval-details > summary {
-    flex-shrink: 0;
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    font-size: 0.72rem;
+    color: var(--muted);
+    user-select: none;
+    list-style: none;
   }
+  .self-eval-details > summary::-webkit-details-marker { display: none; }
   .self-eval-details .self-eval-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
     padding: 1rem;
-    -webkit-overflow-scrolling: touch;
   }
   .self-eval-details .section-grid {
-    overflow: visible;
+    gap: 0.8rem;
   }
 
   /* FEEDBACK OUTPUT */
@@ -306,13 +290,6 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
-    max-height: min(70vh, 600px);
-    display: flex;
-    flex-direction: column;
-  }
-  .feedback-section .feedback-body {
-    overflow-y: auto;
-    min-height: 0;
   }
 
   .feedback-header {
@@ -679,16 +656,14 @@ function renderMemberView(idx) {
     </div>
 
     ${m.managerNotes ? `
-    <div class="section-card section-card--scrollable">
+    <div class="section-card">
       <div class="section-card-header"><span class="dot" style="background:#e5c07b"></span>My Personal Data Points</div>
       <pre>${m.managerNotes}</pre>
     </div>` : ''}
 
-    <details class="self-eval-details" style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
-      <summary style="padding:0.8rem 1rem;cursor:pointer;font-size:0.72rem;color:var(--muted);user-select:none;">
-        📄 Self-Evaluation Data (${Object.keys(m.selfData).length} fields)
-      </summary>
-      <div class="self-eval-body"><div class="section-grid" style="gap:0.8rem;">${selfSections}</div></div>
+    <details class="self-eval-details">
+      <summary>📄 Self-Evaluation Data (${Object.keys(m.selfData).length} fields)</summary>
+      <div class="self-eval-body"><div class="section-grid">${selfSections}</div></div>
     </details>
   `;
 }
