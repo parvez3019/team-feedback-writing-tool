@@ -19,6 +19,11 @@ const PORT = process.env.PORT || 3001;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0';
 
+function log(level, event, data) {
+  const entry = { ts: new Date().toISOString(), level, event, ...data };
+  console.log(JSON.stringify(entry));
+}
+
 function serveFile(filePath, res, contentType) {
   const full = path.join(__dirname, filePath);
   fs.readFile(full, (err, data) => {
@@ -58,10 +63,26 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && req.url === '/api/generate') {
+    const startTime = Date.now();
     try {
       const body = await parseBody(req);
       const rawMessages = body.messages || [];
       const maxTokens = body.max_tokens ?? 1000;
+
+      const promptLength = rawMessages.reduce((n, m) => {
+        const t = typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? (m.content[0]?.text || '') : '');
+        return n + (t || '').length;
+      }, 0);
+
+      log('info', 'api_request', {
+        method: req.method,
+        url: req.url,
+        modelId: BEDROCK_MODEL_ID,
+        region: AWS_REGION,
+        max_tokens: maxTokens,
+        message_count: rawMessages.length,
+        prompt_length_chars: promptLength,
+      });
 
       // Convert to Bedrock format: content must be array of { type: 'text', text: string }
       const messages = rawMessages.map((m) => ({
@@ -89,11 +110,33 @@ const server = http.createServer(async (req, res) => {
       );
 
       const data = JSON.parse(new TextDecoder().decode(response.body));
+      const durationMs = Date.now() - startTime;
+      const usage = data.usage || {};
+      const outputLength = (data.content || []).reduce((n, b) => n + (b.text && b.text.length || 0), 0);
+
+      log('info', 'api_response', {
+        status: 200,
+        duration_ms: durationMs,
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        response_length_chars: outputLength,
+        stop_reason: data.stop_reason,
+      });
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
     } catch (err) {
+      const durationMs = Date.now() - startTime;
       const message = err.message || 'Failed to fetch';
       const status = err.name === 'ValidationException' ? 400 : 500;
+
+      log('error', 'api_response', {
+        status,
+        duration_ms: durationMs,
+        error: message,
+        name: err.name,
+      });
+
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: message }));
     }

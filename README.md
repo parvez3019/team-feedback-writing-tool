@@ -49,7 +49,7 @@ Then open **http://localhost:3001/** in your browser.
 | `AWS_REGION` | `us-east-1` | AWS region for Bedrock |
 | `AWS_ACCESS_KEY_ID` | — | AWS access key (or use default profile) |
 | `AWS_SECRET_ACCESS_KEY` | — | AWS secret key (or use default profile) |
-| `BEDROCK_MODEL_ID` | `anthropic.claude-sonnet-4-20250514-v1:0` | Bedrock model ID (e.g. another Claude Sonnet variant) |
+| `BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Bedrock model ID (e.g. another Claude Sonnet variant) |
 
 ## Excel format
 

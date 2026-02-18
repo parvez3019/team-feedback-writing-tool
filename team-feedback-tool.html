@@ -155,6 +155,7 @@
   /* MAIN AREA */
   .content {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 2rem;
     display: flex;
@@ -263,12 +264,55 @@
     overflow-y: auto;
   }
 
+  .section-card.section-card--scrollable {
+    max-height: min(50vh, 400px);
+    display: flex;
+    flex-direction: column;
+  }
+  .section-card.section-card--scrollable pre {
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .self-eval-details {
+    max-height: min(70vh, 560px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .self-eval-details[open] {
+    max-height: min(70vh, 560px);
+  }
+  .self-eval-details > summary {
+    flex-shrink: 0;
+  }
+  .self-eval-details .self-eval-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .self-eval-details .section-grid {
+    overflow: visible;
+  }
+
   /* FEEDBACK OUTPUT */
   .feedback-section {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
+    max-height: min(70vh, 600px);
+    display: flex;
+    flex-direction: column;
+  }
+  .feedback-section .feedback-body {
+    overflow-y: auto;
+    min-height: 0;
   }
 
   .feedback-header {
@@ -456,6 +500,35 @@ let members = [];
 let currentIdx = null;
 let feedbackStore = {};
 
+function escapeControlCharsInJsonStrings(str) {
+  let out = '';
+  let inStr = false;
+  let i = 0;
+  while (i < str.length) {
+    const c = str[i];
+    if (!inStr) {
+      out += c;
+      if (c === '"') inStr = true;
+      i++;
+      continue;
+    }
+    if (c === '\\' && i + 1 < str.length) { out += c + str[i + 1]; i += 2; continue; }
+    if (c === '"') {
+      let backs = 0;
+      for (let j = out.length - 1; j >= 0 && out[j] === '\\'; j--) backs++;
+      if (backs % 2 === 0) { out += c; inStr = false; } else { out += c; }
+      i++;
+      continue;
+    }
+    if (c === '\n') { out += '\\n'; i++; continue; }
+    if (c === '\r') { out += '\\r'; i++; continue; }
+    if (c === '\t') { out += '\\t'; i++; continue; }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
 document.getElementById('fileInput').addEventListener('change', handleFile);
 
 function handleFile(e) {
@@ -586,34 +659,36 @@ function renderMemberView(idx) {
         <button class="copy-btn" onclick="copyAll(${idx})">Copy All</button>
         <button class="copy-btn" onclick="exportUpdated()" style="color: var(--accent3); border-color: rgba(152,195,121,0.3)">Export XLSX</button>
       </div>
-      <div class="feedback-field">
-        <label>✅ Continue doing</label>
-        <textarea id="contField" placeholder="What should this employee CONTINUE doing?"
-          onchange="saveField(${idx}, 'cont', this.value)">${fb.cont}</textarea>
-      </div>
-      <div class="feedback-field">
-        <label>🛑 Stop doing</label>
-        <textarea id="stopField" placeholder="What should this employee STOP doing?"
-          onchange="saveField(${idx}, 'stop', this.value)">${fb.stop}</textarea>
-      </div>
-      <div class="feedback-field">
-        <label>🚀 Start doing</label>
-        <textarea id="startField" placeholder="What should this employee START doing?"
-          onchange="saveField(${idx}, 'start', this.value)">${fb.start}</textarea>
+      <div class="feedback-body">
+        <div class="feedback-field">
+          <label>✅ Continue doing</label>
+          <textarea id="contField" placeholder="What should this employee CONTINUE doing?"
+            onchange="saveField(${idx}, 'cont', this.value)">${fb.cont}</textarea>
+        </div>
+        <div class="feedback-field">
+          <label>🛑 Stop doing</label>
+          <textarea id="stopField" placeholder="What should this employee STOP doing?"
+            onchange="saveField(${idx}, 'stop', this.value)">${fb.stop}</textarea>
+        </div>
+        <div class="feedback-field">
+          <label>🚀 Start doing</label>
+          <textarea id="startField" placeholder="What should this employee START doing?"
+            onchange="saveField(${idx}, 'start', this.value)">${fb.start}</textarea>
+        </div>
       </div>
     </div>
 
     ${m.managerNotes ? `
-    <div class="section-card">
+    <div class="section-card section-card--scrollable">
       <div class="section-card-header"><span class="dot" style="background:#e5c07b"></span>My Personal Data Points</div>
       <pre>${m.managerNotes}</pre>
     </div>` : ''}
 
-    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+    <details class="self-eval-details" style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
       <summary style="padding:0.8rem 1rem;cursor:pointer;font-size:0.72rem;color:var(--muted);user-select:none;">
         📄 Self-Evaluation Data (${Object.keys(m.selfData).length} fields)
       </summary>
-      <div class="section-grid" style="padding:1rem;gap:0.8rem;">${selfSections}</div>
+      <div class="self-eval-body"><div class="section-grid" style="gap:0.8rem;">${selfSections}</div></div>
     </details>
   `;
 }
@@ -622,6 +697,76 @@ function saveField(idx, field, value) {
   const m = members[idx];
   feedbackStore[m.rowIdx][field] = value;
   renderMemberList();
+}
+
+const BATCH_SIZE = 5;
+
+async function generateFeedbackForIndex(idx) {
+  const m = members[idx];
+  const selfSummary = Object.entries(m.selfData)
+    .filter(([k,v]) => v && String(v).trim())
+    .map(([k,v]) => `### ${k}\n${String(v).slice(0,400)}`)
+    .join('\n\n');
+
+  const prompt = `You are a backend architect writing annual performance review evaluations.
+
+TEAM MEMBER: ${m.name} (${m.email})
+
+SELF-EVALUATION DATA:
+${selfSummary}
+
+MY PERSONAL DATA POINTS (reviewer's notes):
+${m.managerNotes || 'No additional notes provided.'}
+
+Generate three sections of reviewer evaluation. Be specific, professional, and honest. Reference actual work where relevant.
+
+- CONTINUE doing: Base this on the team member's self-evaluation (and optionally your personal data points). What should they keep doing well? 2-4 bullet points.
+
+- STOP doing: Derive this ONLY from "My Personal Data Points" above. What should they stop doing, based solely on the reviewer's notes? 2-4 bullet points. If there are no relevant notes, say so in one brief line.
+
+- START doing: Derive this ONLY from "My Personal Data Points" above. What should they start doing, based solely on the reviewer's notes? 2-4 bullet points. If there are no relevant notes, say so in one brief line.
+
+Respond ONLY in this JSON format:
+{
+  "continue": "bullet point 1\nbullet point 2\nbullet point 3",
+  "stop": "bullet point 1\nbullet point 2",
+  "start": "bullet point 1\nbullet point 2\nbullet point 3"
+}`;
+
+  const apiBase = (window.location.port === '3001' || (window.location.hostname === 'localhost' && window.location.port !== '')) ? '' : 'http://localhost:3001';
+  const apiUrl = apiBase + '/api/generate';
+
+  const res = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || data.message || 'API error');
+  }
+  const text = (data.content || []).map(b => b.text || '').join('');
+  const clean = text.replace(/```json|```/g, '').trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(clean);
+  } catch (parseErr) {
+    if (parseErr instanceof SyntaxError && /control character/i.test(parseErr.message)) {
+      parsed = JSON.parse(escapeControlCharsInJsonStrings(clean));
+    } else {
+      throw parseErr;
+    }
+  }
+
+  feedbackStore[m.rowIdx].cont = parsed.continue || '';
+  feedbackStore[m.rowIdx].stop = parsed.stop || '';
+  feedbackStore[m.rowIdx].start = parsed.start || '';
+  feedbackStore[m.rowIdx].generated = true;
 }
 
 async function generateFeedback(idx) {
@@ -638,72 +783,20 @@ async function generateFeedback(idx) {
 
   [contField, stopField, startField].forEach(f => { f.classList.add('loading'); f.value = 'Generating…'; });
 
-  const selfSummary = Object.entries(m.selfData)
-    .filter(([k,v]) => v && String(v).trim())
-    .map(([k,v]) => `### ${k}\n${String(v).slice(0,400)}`)
-    .join('\n\n');
-
-  const prompt = `You are a senior engineering manager writing annual performance review evaluations. 
-Based on the team member's self-evaluation and personal data points from the reviewer, generate clear, specific, and actionable reviewer evaluations.
-
-TEAM MEMBER: ${m.name} (${m.email})
-
-SELF-EVALUATION DATA:
-${selfSummary}
-
-MANAGER'S PERSONAL DATA POINTS / NOTES:
-${m.managerNotes || 'No additional notes provided.'}
-
-Generate three sections of reviewer evaluation. Be specific, professional, and honest. Reference actual work mentioned. Avoid generic statements. Each section should have 2-4 bullet points.
-
-Respond ONLY in this JSON format:
-{
-  "continue": "bullet point 1\nbullet point 2\nbullet point 3",
-  "stop": "bullet point 1\nbullet point 2",
-  "start": "bullet point 1\nbullet point 2\nbullet point 3"
-}`;
-
-  // Use local proxy to avoid CORS and keep API key server-side (run: node server.js)
-  const apiBase = (window.location.port === '3001' || (window.location.hostname === 'localhost' && window.location.port !== '')) ? '' : 'http://localhost:3001';
-  const apiUrl = apiBase + '/api/generate';
-
   try {
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || data.message || 'API error');
-    }
-    const text = (data.content || []).map(b => b.text || '').join('');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-
-    contField.value = parsed.continue || '';
-    stopField.value = parsed.stop || '';
-    startField.value = parsed.start || '';
-
-    feedbackStore[m.rowIdx].cont = parsed.continue || '';
-    feedbackStore[m.rowIdx].stop = parsed.stop || '';
-    feedbackStore[m.rowIdx].start = parsed.start || '';
-    feedbackStore[m.rowIdx].generated = true;
-
-    [contField, stopField, startField].forEach(f => f.classList.remove('loading'));
-    renderMemberList();
+    await generateFeedbackForIndex(idx);
+    contField.value = feedbackStore[m.rowIdx].cont || '';
+    stopField.value = feedbackStore[m.rowIdx].stop || '';
+    startField.value = feedbackStore[m.rowIdx].start || '';
     showToast(`✓ Evaluation generated for ${m.name}`);
   } catch (err) {
-    [contField, stopField, startField].forEach(f => { f.classList.remove('loading'); f.value = ''; });
+    [contField, stopField, startField].forEach(f => { f.value = ''; });
     showToast('❌ Error: ' + err.message);
     console.error(err);
   }
 
+  [contField, stopField, startField].forEach(f => f.classList.remove('loading'));
+  renderMemberList();
   btn.disabled = false;
   icon.innerHTML = '✨';
 }
@@ -713,16 +806,41 @@ async function generateAll() {
   if (!btn || members.length === 0) return;
   btn.disabled = true;
 
+  const pending = [];
   for (let i = 0; i < members.length; i++) {
-    const m = members[i];
-    const fb = feedbackStore[m.rowIdx];
-    if (fb.cont && fb.stop && fb.start) continue; // skip already done
+    const fb = feedbackStore[members[i].rowIdx];
+    if (fb.cont && fb.stop && fb.start) continue;
+    pending.push(i);
+  }
 
-    btn.textContent = `⟳ Generating ${i+1}/${members.length}…`;
-    selectMember(i);
-    await new Promise(r => setTimeout(r, 300));
-    await generateFeedback(i);
-    await new Promise(r => setTimeout(r, 500));
+  for (let b = 0; b < pending.length; b += BATCH_SIZE) {
+    const batch = pending.slice(b, b + BATCH_SIZE);
+    const start = b + 1;
+    const end = Math.min(b + BATCH_SIZE, pending.length);
+    btn.textContent = `⟳ Batch ${Math.floor(b / BATCH_SIZE) + 1} – Generating ${start}–${end}/${pending.length}…`;
+
+    const results = await Promise.allSettled(
+      batch.map((i) => generateFeedbackForIndex(i))
+    );
+
+    const failed = results
+      .map((r, j) => (r.status === 'rejected' ? batch[j] : null))
+      .filter((i) => i != null);
+    if (failed.length) {
+      const names = failed.map((i) => members[i].name).join(', ');
+      showToast(`❌ Failed: ${names}`);
+      console.error('Batch failures:', results.filter((r) => r.status === 'rejected'));
+    }
+
+    renderMemberList();
+    if (currentIdx !== null && batch.includes(currentIdx)) {
+      const contField = document.getElementById('contField');
+      const stopField = document.getElementById('stopField');
+      const startField = document.getElementById('startField');
+      if (contField) contField.value = feedbackStore[members[currentIdx].rowIdx].cont || '';
+      if (stopField) stopField.value = feedbackStore[members[currentIdx].rowIdx].stop || '';
+      if (startField) startField.value = feedbackStore[members[currentIdx].rowIdx].start || '';
+    }
   }
 
   btn.disabled = false;
